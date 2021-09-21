@@ -2,10 +2,24 @@ const Blockchain=require("./blockchain");
 
 const bitcoin=new Blockchain();
 
-bitcoin.createNewBlock(1234,"wkfh34fq43ijfoiwe","eieuffhnweichscejwc4");
+const previousBlockHash="orqoreniernvrequhvng";
 
-bitcoin.createNewTransaction(100,"0xfnjngjrnreknf","0xjrnjgbenwkr");
+const currentBlockData=[
+    {
+        amount:101,
+        sender:"jn5itng84nri4nfnf",
+        recipient:"8tnij3n3irnin44"
+    },
+    {
+        amount:200,
+        sender:"rngoqrejorm",
+        recipient:"lwekmklkrmgr"
+    },
+    {
+        amount:5000,
+        sender:"wkmroijmoiv",
+        recipient:"wrkngriunqgoip"
+    }
+];
 
-bitcoin.createNewBlock(4567,"0xhrekenrervken","0xuihgnguh4i4h48tn");
-
-console.log(bitcoin);
+console.log(bitcoin.proofOfWork(previousBlockHash,currentBlockData));
