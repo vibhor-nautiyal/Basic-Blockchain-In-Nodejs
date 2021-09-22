@@ -21,14 +21,14 @@ app.get("/blockchain",function(req,res){
 });
 
 
-app.post("/transactions",function(req,res){
+app.post("/transaction",function(req,res){
     
     const newTransaction=req.body;
     const blockIdx=bitcoin.addTransactionToPendingTransactions(newTransaction);
 
     res.json(
         {
-            "note":"Transaction will be added in block number "+blockIndex
+            "note":"Transaction will be added in block number "+blockIdx
         }
     );
 });
@@ -49,17 +49,73 @@ app.get("/mine",function(req,res){
     //Now the miner node has to be awarded
     //Let rewarding address = 00
     //The address of the miner (this particular node in our local system) is created by uuid
-    bitcoin.createNewTransaction(6.25,"00",nodeAddress);
+   
+   
+    // bitcoin.createNewTransaction(6.25,"00",nodeAddress);
 
     const newBlock=bitcoin.createNewBlock(nonce,previousBlockHash,currentBlockHash);
     
+    addBlockRequests=[];
 
-    res.json({
-        "note":"New block mined successfully",
-        "block": newBlock
+    bitcoin.networkNodes.forEach(networkNode=>{
+
+        reqOptions={
+            method:"POST",
+            uri:networkNode+"/receive-block",
+            body:newBlock,
+            json:true
+        };
+
+        addBlockRequests.push(rp(reqOptions));
+
+    });
+
+    Promise.all(addBlockRequests)
+    .then(data=>{
+        const reqOptions={
+            uri: bitcoin.currentNodeUrl+"/transaction-broadcast",
+            method:"POST",
+            body:{
+                amount: 6.25,
+                sender: "00",
+                recipient: nodeAddress
+            },
+            json:true
+        };
+        return rp(reqOptions);
+    })
+    .then(data=>{
+        res.json({
+            "note":"New block mined successfully",
+            "block": newBlock
+        });
     });
 });
 
+
+app.post("/receive-block",function(req,res){
+    const newBlock=req.body;
+    const lastBlock=bitcoin.getLastBlock();
+    const legalHash=(lastBlock.hash==newBlock.previousBlockHash);
+    const legalIndex=lastBlock.index+1==newBlock.index;
+    if(legalHash && legalIndex){
+
+        bitcoin.chain.push(newBlock);
+        bitcoin.pendingTransactions=[];
+        res.json(
+            {
+                note:"New block received",
+                newBlock:newBlock
+            }
+        );
+    }
+    res.json(
+        {
+            note:"New block rejected",
+            newBlock:newBlock
+        }
+    );
+});
 
 app.post("/register-and-broadcast-node",function(req,res){
 
@@ -69,7 +125,7 @@ app.post("/register-and-broadcast-node",function(req,res){
 
     const newNodeUrl= req.body.newNodeUrl;  //sent with request body
 
-    if(bitcoin.networkNodes.indexOf(newNodeUrl)==-1)
+    if(bitcoin.networkNodes.indexOf(newNodeUrl)==-1 && newNodeUrl!=bitcoin.currentNodeUrl)
         bitcoin.networkNodes.push(newNodeUrl);
 
     const reqPromises=[];
