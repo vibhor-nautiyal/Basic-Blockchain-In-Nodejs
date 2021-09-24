@@ -225,6 +225,98 @@ app.post("/transaction-broadcast",function(req,res){
 
 });
 
+app.get("/consensus",function(req,res){
+
+
+    const reqPromises=[];
+
+    bitcoin.networkNodes.forEach(networkNodeUrl=>{
+
+        const reqOptions={
+            uri: networkNodeUrl+"/blockchain",
+            method:"GET",
+            json:true
+        };
+
+        reqPromises.push(rp(reqOptions));
+
+    });
+
+    Promise.all(reqPromises)
+    .then(blockchains=>{
+
+        const currChainLength=bitcoin.chain.length;
+
+        let maxChainLength=currChainLength;
+        let newLongestChain=null;
+        let newPendingTransactions=null;
+
+        blockchains.forEach(blockchain=>{
+
+            if(blockchain.chain.length>maxChainLength){
+
+                maxChainLength=blockchain.chain.length;
+                newLongestChain=blockchain.chain;
+                newPendingTransactions=blockchain.pendingTransactions;
+            }
+        });
+
+        if(!newLongestChain || (newLongestChain && !bitcoin.chainIsValid(newLongestChain))){
+            res.json(
+                {
+                    note: "Current chain has not been replaced",
+                    chain: bitcoin.chain
+                }
+            );
+        }
+
+        bitcoin.chain=newLongestChain;
+        bitcoin.pendingTransactions=newPendingTransactions;
+        res.json(
+            {
+                note: "Current chain has been replaced",
+                chain: bitcoin.chain
+            }
+        );
+
+
+    });
+});
+
+
+app.get("/block/:blockHash",function(req,res){
+
+    const blockHash=req.params.blockHash;
+    // console.log("required= "+blockHash);
+    const block=bitcoin.getBlock(blockHash);
+    
+    res.json({block: block});
+    
+});
+
+app.get("/transaction/:transactionId",function(req,res){
+
+    const txnId=req.params.transactionId;
+    const transaction=bitcoin.getTransaction(txnId);
+
+    res.send(transaction);
+
+});
+
+app.get("/address/:addressId",function(req,res){
+
+    const address=req.params.addressId;
+
+    const addressDetails=bitcoin.getAddressData(address);
+
+    res.send(addressDetails);
+
+});
+
+app.get("/block-explorer",function(req,res){
+
+    res.sendFile("./block-explorer/index.html",{root: __dirname});
+});
 
 app.listen(portNo,function(){
     console.log("Listening at port "+portNo);
